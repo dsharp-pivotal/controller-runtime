@@ -2,7 +2,6 @@ package testingclient_test
 
 import (
 	"errors"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -43,9 +42,18 @@ var _ = Describe("ErrorInjector", func() {
 		subject = testingclient.NewErrorInjector(fakeClient)
 	})
 
+	Describe("Invalid Action", func() {
+		It("does not return injected error for invalid actions", func() {
+			subject.InjectError("invalid", &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
+
+			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
+			var obj corev1.Pod
+			Expect(subject.Get(nil, key, &obj)).To(Succeed())
+		})
+	})
 	Describe("Get", func() {
 		It("can inject errors on calls to Get", func() {
-			subject.InjectError("get", &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
+			subject.InjectError(testingclient.GetAction, &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -53,7 +61,7 @@ var _ = Describe("ErrorInjector", func() {
 		})
 
 		It("calls the delegate client if no errors match", func() {
-			subject.InjectError("get", &corev1.Service{}, testingclient.AnyObject, exampleError)
+			subject.InjectError(testingclient.GetAction, &corev1.Service{}, testingclient.AnyObject, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -74,7 +82,7 @@ var _ = Describe("ErrorInjector", func() {
 			},
 		}
 		It("can inject errors on calls to Create", func() {
-			subject.InjectError("create", &corev1.Pod{}, client.ObjectKey{Name: "pod3", Namespace: "ns"}, exampleError)
+			subject.InjectError(testingclient.CreateAction, &corev1.Pod{}, client.ObjectKey{Name: "pod3", Namespace: "ns"}, exampleError)
 
 			Expect(subject.Create(nil, &pod3)).To(MatchError("injected error"))
 
@@ -85,7 +93,7 @@ var _ = Describe("ErrorInjector", func() {
 		})
 
 		It("calls the delegate client if no errors match", func() {
-			subject.InjectError("create", &corev1.Service{}, testingclient.AnyObject, exampleError)
+			subject.InjectError(testingclient.CreateAction, &corev1.Service{}, testingclient.AnyObject, exampleError)
 
 			Expect(subject.Create(nil, &pod3)).To(Succeed())
 
@@ -100,7 +108,7 @@ var _ = Describe("ErrorInjector", func() {
 
 	Describe("Delete", func() {
 		It("can inject errors on calls to Delete", func() {
-			subject.InjectError("delete", &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
+			subject.InjectError(testingclient.DeleteAction, &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -113,7 +121,7 @@ var _ = Describe("ErrorInjector", func() {
 		})
 
 		It("calls the delegate client if no errors match", func() {
-			subject.InjectError("delete", &corev1.Service{}, testingclient.AnyObject, exampleError)
+			subject.InjectError(testingclient.DeleteAction, &corev1.Service{}, testingclient.AnyObject, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			obj := corev1.Pod{
@@ -132,7 +140,7 @@ var _ = Describe("ErrorInjector", func() {
 
 	Describe("Update", func() {
 		It("can inject errors on calls to Update", func() {
-			subject.InjectError("update", &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
+			subject.InjectError(testingclient.UpdateAction, &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -147,7 +155,7 @@ var _ = Describe("ErrorInjector", func() {
 		})
 
 		It("calls the delegate client if no errors match", func() {
-			subject.InjectError("update", &corev1.Service{}, testingclient.AnyObject, exampleError)
+			subject.InjectError(testingclient.UpdateAction, &corev1.Service{}, testingclient.AnyObject, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -163,7 +171,7 @@ var _ = Describe("ErrorInjector", func() {
 
 	Describe("Patch", func() {
 		It("can inject errors on calls to Patch", func() {
-			subject.InjectError("patch", &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
+			subject.InjectError(testingclient.PatchAction, &corev1.Pod{}, client.ObjectKey{Name: "pod1", Namespace: "ns"}, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -178,7 +186,7 @@ var _ = Describe("ErrorInjector", func() {
 		})
 
 		It("calls the delegate client if no errors match", func() {
-			subject.InjectError("patch", &corev1.Service{}, testingclient.AnyObject, exampleError)
+			subject.InjectError(testingclient.PatchAction, &corev1.Service{}, testingclient.AnyObject, exampleError)
 
 			key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 			var obj corev1.Pod
@@ -201,12 +209,12 @@ var _ = Describe("ErrorInjector", func() {
 		var pod2 corev1.Pod
 		Expect(subject.Get(nil, pod2Key, &pod2)).To(Succeed())
 
-		subject.InjectError("get", &corev1.Pod{}, pod1Key, errors.New("error 1"))
-		subject.InjectError("get", &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2"))
+		subject.InjectError(testingclient.GetAction, &corev1.Pod{}, pod1Key, errors.New("error 1"))
+		subject.InjectError(testingclient.GetAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2"))
 		subject.InjectError(testingclient.AnyAction, &corev1.Pod{}, pod1Key, errors.New("error 3"))
-		subject.InjectError("get", testingclient.AnyKind, pod1Key, errors.New("error 4"))
+		subject.InjectError(testingclient.GetAction, testingclient.AnyKind, pod1Key, errors.New("error 4"))
 		subject.InjectError(testingclient.AnyAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 5"))
-		subject.InjectError("get", testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6"))
+		subject.InjectError(testingclient.GetAction, testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6"))
 		subject.InjectError(testingclient.AnyAction, testingclient.AnyKind, pod1Key, errors.New("error 7"))
 		subject.InjectError(testingclient.AnyAction, testingclient.AnyKind, testingclient.AnyObject, errors.New("error 8"))
 
@@ -228,7 +236,7 @@ var _ = Describe("ErrorInjector", func() {
 
 	Describe("preferences between wildcard injections", func() {
 		type injection struct {
-			action        string
+			action        testingclient.Action
 			kind          client.Object
 			objectKey     client.ObjectKey
 			injectedError error
@@ -253,28 +261,28 @@ var _ = Describe("ErrorInjector", func() {
 		pod1Key := types.NamespacedName{Namespace: "ns", Name: "pod1"}
 
 		ItPrefers("AnyObject(2) matches over AnyAction(3) matches",
-			injection{"get", &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2")},
+			injection{testingclient.GetAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2")},
 			injection{testingclient.AnyAction, &corev1.Pod{}, pod1Key, errors.New("error 3")},
 		)
 
 		ItPrefers("AnyObject(2) matches over AnyKind(4) matches",
-			injection{"get", &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2")},
-			injection{"get", testingclient.AnyKind, pod1Key, errors.New("error 4")},
+			injection{testingclient.GetAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 2")},
+			injection{testingclient.GetAction, testingclient.AnyKind, pod1Key, errors.New("error 4")},
 		)
 
 		ItPrefers("AnyAction(3) matches over AnyKind(4) matches",
 			injection{testingclient.AnyAction, &corev1.Pod{}, pod1Key, errors.New("error 3")},
-			injection{"get", testingclient.AnyKind, pod1Key, errors.New("error 4")},
+			injection{testingclient.GetAction, testingclient.AnyKind, pod1Key, errors.New("error 4")},
 		)
 
 		ItPrefers("AnyKind(4) matches over AnyAction,AnyObject(5) matches",
-			injection{"get", testingclient.AnyKind, pod1Key, errors.New("error 4")},
+			injection{testingclient.GetAction, testingclient.AnyKind, pod1Key, errors.New("error 4")},
 			injection{testingclient.AnyAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 5")},
 		)
 
 		ItPrefers("AnyAction,AnyObject(5) matches over AnyKind,AnyObject(6)",
 			injection{testingclient.AnyAction, &corev1.Pod{}, testingclient.AnyObject, errors.New("error 5")},
-			injection{"get", testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6")},
+			injection{testingclient.GetAction, testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6")},
 		)
 
 		ItPrefers("AnyAction,AnyObject(5) matches over AnyAction,AnyKind(7)",
@@ -283,7 +291,7 @@ var _ = Describe("ErrorInjector", func() {
 		)
 
 		ItPrefers("AnyKind,AnyObject(6) matches over AnyAction,AnyKind(7)",
-			injection{"get", testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6")},
+			injection{testingclient.GetAction, testingclient.AnyKind, testingclient.AnyObject, errors.New("error 6")},
 			injection{testingclient.AnyAction, testingclient.AnyKind, pod1Key, errors.New("error 7")},
 		)
 	})
